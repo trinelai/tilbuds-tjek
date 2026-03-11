@@ -464,15 +464,11 @@
         return;
       }
 
-      let indhold;
-      if (data.content) {
-        indhold = JSON.parse(atob(data.content.replace(/\n/g,"")));
-      } else if (data.download_url) {
-        const r2 = await fetch(data.download_url);
-        indhold = await r2.json();
-      } else {
-        throw new Error("Filindhold mangler – prøv at slette og genupload produkter.json");
-      }
+      // Hent filen som rå JSON direkte – undgår base64-problemer
+      const rawUrl = `https://raw.githubusercontent.com/${getUser()}/${REPO}/main/${FILE}`;
+      const r2 = await fetch(rawUrl + "?t=" + Date.now()); // ?t= undgår cache
+      if (!r2.ok) throw new Error(`Kunne ikke hente ${FILE} – er filen uploadet?`);
+      const indhold = await r2.json();
       produkter = indhold;
       harÆndringer = false;
       renderListe();
