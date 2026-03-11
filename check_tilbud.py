@@ -1,18 +1,18 @@
 """
 Dansk supermarked tilbuds-checker
-Bruger eTilbudsavis.dk som datakilde.
+Bruger eTilbudsavis.dk som datakilde (Next.js __NEXT_DATA__).
 Kører hver søndag via GitHub Actions og sender en mail
 hvis dine ønskede produkter er på tilbud.
 """
 
 import smtplib
 import os
-import re
 import json
 from datetime import datetime, timezone
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import requests
+from bs4 import BeautifulSoup
 
 # ─── Produkter vi leder efter ────────────────────────────────────────────────
 PRODUCTS = [
@@ -21,13 +21,12 @@ PRODUCTS = [
     {"søgeord": "smør",                          "navn": "Smør"},
     {"søgeord": "kims peanuts",                  "navn": "Kims saltede peanuts 1 kg"},
     {"søgeord": "den grønne slagter rullepølse", "navn": "Den Grønne Slagter rullepølse"},
-    {"søgeord": "æg",                            "navn": "Æg"},
 ]
 
 # ─── Butikker vi vil tjekke ───────────────────────────────────────────────────
 BUTIKKER = ["REMA 1000", "MENY", "365discount", "Coop 365"]
 
-# ─── Email-opsætning (sættes som GitHub Secrets) ─────────────────────────────
+# ─── Email-opsætning ─────────────────────────────────────────────────────────
 EMAIL_SENDER   = os.environ["EMAIL_SENDER"]
 EMAIL_PASSWORD = os.environ["EMAIL_PASSWORD"]
 EMAIL_RECEIVER = os.environ["EMAIL_RECEIVER"]
@@ -38,39 +37,45 @@ HEADERS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/120.0.0.0 Safari/537.36"
     ),
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "da-DK,da;q=0.9",
 }
 
 
-# ─── Udtræk JSON fra HTML-side ────────────────────────────────────────────────
-def udtræk_json(html: str) -> list[dict]:
-    """Find og parse {"data":[...]} blokken i HTML-siden."""
-    # Find startposition af JSON
-    start = html.find('{"data":[')
-    if start == -1:
-        return []
-
-    # Tæl krøllede parenteser for at finde korrekt slutning
-    depth = 0
-    end = start
-    for i, ch in enumerate(html[start:], start):
-        if ch == '{':
-            depth += 1
-        elif ch == '}':
-            depth -= 1
-            if depth == 0:
-                end = i + 1
-                break
-
-    raw = html[start:end]
+# ─── Udtræk data fra Next.js __NEXT_DATA__ ───────────────────────────────────
+def udtræk_next_data(html: str) -> dict:
+    """Find og parse <script id="__NEXT_DATA__"> blokken."""
+    soup = BeautifulSoup(html, "html.parser")
+    tag = soup.find("script", {"id": "__NEXT_DATA__"})
+    if not tag:
+        print("  __NEXT_DATA__ ikke fundet – prøver alternativ metode")
+        return {}
     try:
-        data = json.loads(raw)
-        return data.get("data", [])
-    except json.JSONDecodeError as e:
-        print(f"  JSON-fejl: {e}")
-        print(f"  Første 200 tegn af rådata: {raw[:200]}")
-        return []
+        return json.loads(tag.string)
+    except Exception as e:
+        print(f"  JSON-fejl i __NEXT_DATA__: {e}")
+        return {}
+
+
+def find_tilbud_i_data(data: dict, dybde: int = 0) -> list:
+    """Rekursivt søg efter lister af tilbuds-objekter i Next.js data-træet."""
+    resultater = []
+    if dybde > 10:
+        return resultater
+
+    if isinstance(data, list):
+        # Tjek om det er en liste af tilbuds-objekter
+        if data and isinstance(data[0], dict) and any(
+            k in data[0] for k in ["validUntil", "price", "dealer", "business"]
+        ):
+            return data
+        for item in data:
+            resultater.extend(find_tilbud_i_data(item, dybde + 1))
+
+    elif isinstance(data, dict):
+        for v in data.values():
+            resultater.extend(find_tilbud_i_data(v, dybde + 1))
+
+    return resultater
 
 
 # ─── Søg på eTilbudsavis ─────────────────────────────────────────────────────
@@ -79,15 +84,22 @@ def søg_etilbudsavis(søgeord: str) -> list[dict]:
     try:
         r = requests.get(url, headers=HEADERS, timeout=15)
         r.raise_for_status()
-
         print(f"  HTTP {r.status_code} – side er {len(r.text)} tegn lang")
 
-        resultater = udtræk_json(r.text)
-        print(f"  Fandt {len(resultater)} resultater i JSON")
+        next_data = udtræk_next_data(r.text)
+        if not next_data:
+            return []
+
+        # Debug: print øverste nøgler
+        props = next_data.get("props", {}).get("pageProps", {})
+        print(f"  pageProps nøgler: {list(props.keys())[:10]}")
+
+        resultater = find_tilbud_i_data(props)
+        print(f"  Fandt {len(resultater)} tilbuds-objekter")
         return resultater
 
     except Exception as e:
-        print(f"  Fejl ved søgning på '{søgeord}': {e}")
+        print(f"  Fejl: {e}")
         return []
 
 
@@ -97,31 +109,37 @@ def filtrer_tilbud(resultater: list[dict], produkt_navn: str) -> list[dict]:
     fundne = []
 
     for item in resultater:
-        butik = item.get("business", {}).get("name", "")
+        # Butiksnavn kan ligge forskellige steder
+        butik = (
+            item.get("business", {}).get("name", "") or
+            item.get("dealer", {}).get("name", "") or
+            item.get("store", {}).get("name", "")
+        )
 
         if not any(b.lower() in butik.lower() for b in BUTIKKER):
             continue
 
         # Tjek om tilbuddet er aktivt
         try:
-            til_str = item.get("validUntil", "").replace("+0000", "+00:00")
-            fra_str = item.get("validFrom", "").replace("+0000", "+00:00")
-            til = datetime.fromisoformat(til_str)
-            fra = datetime.fromisoformat(fra_str)
-            if nu < fra or nu > til:
-                continue
+            til_str = (item.get("validUntil") or item.get("run_till") or "").replace("+0000", "+00:00")
+            fra_str = (item.get("validFrom") or item.get("run_from") or "").replace("+0000", "+00:00")
+            if til_str and fra_str:
+                til = datetime.fromisoformat(til_str)
+                fra = datetime.fromisoformat(fra_str)
+                if nu < fra or nu > til:
+                    continue
         except Exception:
-            pass  # Hvis datoer ikke kan parses, inkludér alligevel
+            pass
 
-        pris = item.get("price")
-        beskrivelse = item.get("description", "")
+        pris = item.get("price") or item.get("pricing", {}).get("price")
+        beskrivelse = item.get("description") or item.get("heading", "")
 
         fundne.append({
             "butik":       butik,
             "produkt":     produkt_navn,
-            "tilbudsnavn": item.get("name", produkt_navn),
+            "tilbudsnavn": item.get("name") or item.get("heading", produkt_navn),
             "pris":        f"{pris} kr." if pris else "Se avis",
-            "beskrivelse": (beskrivelse[:80] + "…") if len(beskrivelse) > 80 else beskrivelse,
+            "beskrivelse": (beskrivelse[:80] + "…") if beskrivelse and len(beskrivelse) > 80 else (beskrivelse or ""),
             "url":         f"https://etilbudsavis.dk/soeg/{requests.utils.quote(produkt_navn)}",
         })
 
@@ -151,7 +169,6 @@ def send_email(tilbud: list[dict]) -> None:
                 <a href="{t['url']}" style="color:#2d7a2d;">Se tilbud →</a>
               </td>
             </tr>"""
-
         body = f"""
         <html><body style="font-family:Arial,sans-serif;max-width:800px;margin:auto;padding:20px;">
           <h2 style="color:#2d7a2d;">🛒 Ugentlige tilbud på dine produkter</h2>
@@ -167,9 +184,7 @@ def send_email(tilbud: list[dict]) -> None:
             </tr>
             {rows}
           </table>
-          <p style="color:#aaa;font-size:0.8em;margin-top:24px;">
-            Automatisk tjekket via eTilbudsavis.dk · Kører hver søndag ✓
-          </p>
+          <p style="color:#aaa;font-size:0.8em;margin-top:24px;">Automatisk tjekket via eTilbudsavis.dk · Kører hver søndag ✓</p>
         </body></html>
         """
     else:
@@ -179,7 +194,7 @@ def send_email(tilbud: list[dict]) -> None:
           <h2>🛒 Ingen tilbud denne uge</h2>
           <p>Ingen af følgende produkter var på tilbud i REMA 1000, MENY eller 365discount:</p>
           <ul>{ingen_rows}</ul>
-          <p>Tjek selv på <a href="https://etilbudsavis.dk">etilbudsavis.dk</a> for at være sikker.</p>
+          <p>Tjek selv på <a href="https://etilbudsavis.dk">etilbudsavis.dk</a>.</p>
           <p style="color:#aaa;font-size:0.8em;">Automatisk tjekket · Kører hver søndag ✓</p>
         </body></html>
         """
