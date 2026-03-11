@@ -37,8 +37,40 @@ HEADERS = {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/120.0.0.0 Safari/537.36"
-    )
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "da-DK,da;q=0.9",
 }
+
+
+# ─── Udtræk JSON fra HTML-side ────────────────────────────────────────────────
+def udtræk_json(html: str) -> list[dict]:
+    """Find og parse {"data":[...]} blokken i HTML-siden."""
+    # Find startposition af JSON
+    start = html.find('{"data":[')
+    if start == -1:
+        return []
+
+    # Tæl krøllede parenteser for at finde korrekt slutning
+    depth = 0
+    end = start
+    for i, ch in enumerate(html[start:], start):
+        if ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0:
+                end = i + 1
+                break
+
+    raw = html[start:end]
+    try:
+        data = json.loads(raw)
+        return data.get("data", [])
+    except json.JSONDecodeError as e:
+        print(f"  JSON-fejl: {e}")
+        print(f"  Første 200 tegn af rådata: {raw[:200]}")
+        return []
 
 
 # ─── Søg på eTilbudsavis ─────────────────────────────────────────────────────
@@ -48,20 +80,11 @@ def søg_etilbudsavis(søgeord: str) -> list[dict]:
         r = requests.get(url, headers=HEADERS, timeout=15)
         r.raise_for_status()
 
-        # JSON er indlejret i siden – udtræk med regex
-        match = re.search(r'\{"data":\[.*', r.text, re.DOTALL)
-        if not match:
-            print(f"  Ingen JSON fundet for '{søgeord}'")
-            return []
+        print(f"  HTTP {r.status_code} – side er {len(r.text)} tegn lang")
 
-        raw = match.group(0)
-        # Find afslutningen på data-arrayet
-        idx = raw.find('}]}')
-        if idx != -1:
-            raw = raw[:idx + 3]
-
-        data = json.loads(raw)
-        return data.get("data", [])
+        resultater = udtræk_json(r.text)
+        print(f"  Fandt {len(resultater)} resultater i JSON")
+        return resultater
 
     except Exception as e:
         print(f"  Fejl ved søgning på '{søgeord}': {e}")
@@ -81,12 +104,14 @@ def filtrer_tilbud(resultater: list[dict], produkt_navn: str) -> list[dict]:
 
         # Tjek om tilbuddet er aktivt
         try:
-            til = datetime.fromisoformat(item.get("validUntil", "").replace("+0000", "+00:00"))
-            fra = datetime.fromisoformat(item.get("validFrom", "").replace("+0000", "+00:00"))
+            til_str = item.get("validUntil", "").replace("+0000", "+00:00")
+            fra_str = item.get("validFrom", "").replace("+0000", "+00:00")
+            til = datetime.fromisoformat(til_str)
+            fra = datetime.fromisoformat(fra_str)
             if nu < fra or nu > til:
                 continue
         except Exception:
-            pass
+            pass  # Hvis datoer ikke kan parses, inkludér alligevel
 
         pris = item.get("price")
         beskrivelse = item.get("description", "")
@@ -96,7 +121,7 @@ def filtrer_tilbud(resultater: list[dict], produkt_navn: str) -> list[dict]:
             "produkt":     produkt_navn,
             "tilbudsnavn": item.get("name", produkt_navn),
             "pris":        f"{pris} kr." if pris else "Se avis",
-            "beskrivelse": beskrivelse[:80] if beskrivelse else "",
+            "beskrivelse": (beskrivelse[:80] + "…") if len(beskrivelse) > 80 else beskrivelse,
             "url":         f"https://etilbudsavis.dk/soeg/{requests.utils.quote(produkt_navn)}",
         })
 
@@ -178,11 +203,10 @@ if __name__ == "__main__":
     alle_tilbud = []
 
     for produkt in PRODUCTS:
-        print(f"  Søger efter: {produkt['navn']}...")
+        print(f"\nSøger efter: {produkt['navn']}...")
         resultater = søg_etilbudsavis(produkt["søgeord"])
         fundne = filtrer_tilbud(resultater, produkt["navn"])
-        if fundne:
-            print(f"    → Fandt {len(fundne)} tilbud!")
+        print(f"  → {len(fundne)} relevante tilbud i REMA/MENY/365discount")
         alle_tilbud.extend(fundne)
 
     print(f"\nTotal: {len(alle_tilbud)} tilbud fundet.")
