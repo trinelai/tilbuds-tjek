@@ -1,0 +1,30 @@
+name: Ugentlig tilbuds-tjek
+
+on:
+  schedule:
+    # Kører hver søndag kl. 08:00 dansk tid (= 06:00 UTC om sommeren)
+    - cron: "0 6 * * 0"
+  workflow_dispatch:   # Giver dig mulighed for at køre det manuelt med et klik
+
+jobs:
+  check-deals:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Hent kode fra repository
+        uses: actions/checkout@v4
+
+      - name: Opsæt Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Installér afhængigheder
+        run: pip install requests beautifulsoup4
+
+      - name: Kør tilbuds-tjek og send mail
+        env:
+          EMAIL_SENDER:   ${{ secrets.EMAIL_SENDER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_RECEIVER: ${{ secrets.EMAIL_RECEIVER }}
+        run: python check_tilbud.py
