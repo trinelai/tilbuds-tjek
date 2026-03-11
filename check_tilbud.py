@@ -21,7 +21,7 @@ PRODUCTS = [
     {"søgeord": "smør",                          "navn": "Smør"},
     {"søgeord": "kims peanuts",                  "navn": "Kims saltede peanuts 1 kg"},
     {"søgeord": "den grønne slagter rullepølse", "navn": "Den Grønne Slagter rullepølse"},
-    {"søgeord": "æg",                            "navn": "æg"},
+    {"søgeord": "æg",                            "navn": "Æg"},
 ]
 
 # ─── Butikker vi vil tjekke ───────────────────────────────────────────────────
