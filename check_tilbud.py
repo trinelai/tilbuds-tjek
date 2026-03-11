@@ -165,7 +165,7 @@ def søg_tilbudsugen(søgeord: str, produkt_navn: str) -> list:
                 "tilbudsnavn": tilbudsnavn,
                 "pris":        pris,
                 "beskrivelse": datoer,
-                "url":         "https://www.tilbudsugen.dk" + href,
+                "url":         href if href.startswith("http") else "https://www.tilbudsugen.dk" + href,
             })
             antal += 1
 
