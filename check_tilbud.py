@@ -1,5 +1,6 @@
 """
 Dansk supermarked tilbuds-checker
+Bruger eTilbudsavis.dk som datakilde.
 Kører hver søndag via GitHub Actions og sender en mail
 hvis dine ønskede produkter er på tilbud.
 """
@@ -7,24 +8,28 @@ hvis dine ønskede produkter er på tilbud.
 import smtplib
 import os
 import re
+import json
+from datetime import datetime, timezone
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import requests
-from bs4 import BeautifulSoup
 
 # ─── Produkter vi leder efter ────────────────────────────────────────────────
 PRODUCTS = [
-    "schulstad gilleleje",
-    "spidskål",
-    "smør",
-    "kims peanuts",
-    "den grønne slagter rullepølse",
+    {"søgeord": "schulstad gilleleje",          "navn": "Schulstad Gilleleje Havn rugbrød"},
+    {"søgeord": "spidskål",                      "navn": "Spidskål"},
+    {"søgeord": "smør",                          "navn": "Smør"},
+    {"søgeord": "kims peanuts",                  "navn": "Kims saltede peanuts 1 kg"},
+    {"søgeord": "den grønne slagter rullepølse", "navn": "Den Grønne Slagter rullepølse"},
 ]
 
+# ─── Butikker vi vil tjekke ───────────────────────────────────────────────────
+BUTIKKER = ["REMA 1000", "MENY", "365discount", "Coop 365"]
+
 # ─── Email-opsætning (sættes som GitHub Secrets) ─────────────────────────────
-EMAIL_SENDER   = os.environ["EMAIL_SENDER"]    # din Gmail-adresse
-EMAIL_PASSWORD = os.environ["EMAIL_PASSWORD"]  # Gmail app-adgangskode
-EMAIL_RECEIVER = os.environ["EMAIL_RECEIVER"]  # modtager (kan være dig selv)
+EMAIL_SENDER   = os.environ["EMAIL_SENDER"]
+EMAIL_PASSWORD = os.environ["EMAIL_PASSWORD"]
+EMAIL_RECEIVER = os.environ["EMAIL_RECEIVER"]
 
 HEADERS = {
     "User-Agent": (
@@ -34,135 +39,122 @@ HEADERS = {
     )
 }
 
-# ─── Hjælpefunktion: søg efter produkt i tekst ───────────────────────────────
-def product_found(text: str, product: str) -> bool:
-    """Returnerer True hvis alle ord i produktnavnet findes i teksten."""
-    text_lower = text.lower()
-    return all(word in text_lower for word in product.lower().split())
 
-
-# ─── Scraper: REMA 1000 ───────────────────────────────────────────────────────
-def check_rema() -> list[dict]:
-    found = []
+# ─── Søg på eTilbudsavis ─────────────────────────────────────────────────────
+def søg_etilbudsavis(søgeord: str) -> list[dict]:
+    url = f"https://etilbudsavis.dk/soeg/{requests.utils.quote(søgeord)}"
     try:
-        r = requests.get("https://rema1000.dk/avis", headers=HEADERS, timeout=15)
-        soup = BeautifulSoup(r.text, "html.parser")
-        page_text = soup.get_text(" ", strip=True)
+        r = requests.get(url, headers=HEADERS, timeout=15)
+        r.raise_for_status()
 
-        # Find produkt-blokke (tekst-baseret søgning)
-        for product in PRODUCTS:
-            if product_found(page_text, product):
-                # Prøv at udtrække pris-kontekst
-                pattern = re.compile(re.escape(product.split()[0]), re.IGNORECASE)
-                match = pattern.search(page_text)
-                context = page_text[max(0, match.start()-30):match.start()+80] if match else product
-                found.append({
-                    "butik": "REMA 1000",
-                    "produkt": product,
-                    "kontekst": context.strip(),
-                    "url": "https://rema1000.dk/avis"
-                })
+        # JSON er indlejret i siden – udtræk med regex
+        match = re.search(r'\{"data":\[.*', r.text, re.DOTALL)
+        if not match:
+            print(f"  Ingen JSON fundet for '{søgeord}'")
+            return []
+
+        raw = match.group(0)
+        # Find afslutningen på data-arrayet
+        idx = raw.find('}]}')
+        if idx != -1:
+            raw = raw[:idx + 3]
+
+        data = json.loads(raw)
+        return data.get("data", [])
+
     except Exception as e:
-        print(f"REMA 1000 fejl: {e}")
-    return found
+        print(f"  Fejl ved søgning på '{søgeord}': {e}")
+        return []
 
 
-# ─── Scraper: MENY ────────────────────────────────────────────────────────────
-def check_meny() -> list[dict]:
-    found = []
-    try:
-        r = requests.get("https://meny.dk/ugensavis", headers=HEADERS, timeout=15)
-        soup = BeautifulSoup(r.text, "html.parser")
-        page_text = soup.get_text(" ", strip=True)
+# ─── Filtrer kun relevante butikker og aktive tilbud ─────────────────────────
+def filtrer_tilbud(resultater: list[dict], produkt_navn: str) -> list[dict]:
+    nu = datetime.now(timezone.utc)
+    fundne = []
 
-        for product in PRODUCTS:
-            if product_found(page_text, product):
-                pattern = re.compile(re.escape(product.split()[0]), re.IGNORECASE)
-                match = pattern.search(page_text)
-                context = page_text[max(0, match.start()-30):match.start()+80] if match else product
-                found.append({
-                    "butik": "MENY",
-                    "produkt": product,
-                    "kontekst": context.strip(),
-                    "url": "https://meny.dk/ugensavis"
-                })
-    except Exception as e:
-        print(f"MENY fejl: {e}")
-    return found
+    for item in resultater:
+        butik = item.get("business", {}).get("name", "")
 
+        if not any(b.lower() in butik.lower() for b in BUTIKKER):
+            continue
 
-# ─── Scraper: 365discount (Coop) ─────────────────────────────────────────────
-def check_365() -> list[dict]:
-    found = []
-    try:
-        r = requests.get(
-            "https://365discount.coop.dk/365avis/",
-            headers=HEADERS,
-            timeout=15
-        )
-        soup = BeautifulSoup(r.text, "html.parser")
-        page_text = soup.get_text(" ", strip=True)
+        # Tjek om tilbuddet er aktivt
+        try:
+            til = datetime.fromisoformat(item.get("validUntil", "").replace("+0000", "+00:00"))
+            fra = datetime.fromisoformat(item.get("validFrom", "").replace("+0000", "+00:00"))
+            if nu < fra or nu > til:
+                continue
+        except Exception:
+            pass
 
-        for product in PRODUCTS:
-            if product_found(page_text, product):
-                pattern = re.compile(re.escape(product.split()[0]), re.IGNORECASE)
-                match = pattern.search(page_text)
-                context = page_text[max(0, match.start()-30):match.start()+80] if match else product
-                found.append({
-                    "butik": "365discount",
-                    "produkt": product,
-                    "kontekst": context.strip(),
-                    "url": "https://365discount.coop.dk/365avis/"
-                })
-    except Exception as e:
-        print(f"365discount fejl: {e}")
-    return found
+        pris = item.get("price")
+        beskrivelse = item.get("description", "")
+
+        fundne.append({
+            "butik":       butik,
+            "produkt":     produkt_navn,
+            "tilbudsnavn": item.get("name", produkt_navn),
+            "pris":        f"{pris} kr." if pris else "Se avis",
+            "beskrivelse": beskrivelse[:80] if beskrivelse else "",
+            "url":         f"https://etilbudsavis.dk/soeg/{requests.utils.quote(produkt_navn)}",
+        })
+
+    return fundne
 
 
 # ─── Send email ───────────────────────────────────────────────────────────────
 def send_email(tilbud: list[dict]) -> None:
+    uge = datetime.now().strftime("%-d. %B %Y")
     subject = (
-        f"🛒 {len(tilbud)} tilbud fundet denne uge!"
+        f"🛒 {len(tilbud)} tilbud fundet – {uge}"
         if tilbud
-        else "🛒 Ingen tilbud fundet denne uge"
+        else f"🛒 Ingen tilbud denne uge – {uge}"
     )
 
-    # HTML-indhold
     if tilbud:
         rows = ""
         for t in tilbud:
             rows += f"""
             <tr>
-              <td style="padding:8px;border-bottom:1px solid #eee;"><b>{t['butik']}</b></td>
-              <td style="padding:8px;border-bottom:1px solid #eee;">{t['produkt'].title()}</td>
-              <td style="padding:8px;border-bottom:1px solid #eee;font-size:0.9em;color:#555;">{t['kontekst']}</td>
-              <td style="padding:8px;border-bottom:1px solid #eee;">
-                <a href="{t['url']}">Se avis →</a>
+              <td style="padding:10px;border-bottom:1px solid #eee;"><b>{t['butik']}</b></td>
+              <td style="padding:10px;border-bottom:1px solid #eee;">{t['produkt']}</td>
+              <td style="padding:10px;border-bottom:1px solid #eee;">{t['tilbudsnavn']}</td>
+              <td style="padding:10px;border-bottom:1px solid #eee;color:#2d7a2d;font-weight:bold;">{t['pris']}</td>
+              <td style="padding:10px;border-bottom:1px solid #eee;font-size:0.85em;color:#666;">{t['beskrivelse']}</td>
+              <td style="padding:10px;border-bottom:1px solid #eee;">
+                <a href="{t['url']}" style="color:#2d7a2d;">Se tilbud →</a>
               </td>
             </tr>"""
+
         body = f"""
-        <html><body style="font-family:Arial,sans-serif;max-width:700px;margin:auto;">
+        <html><body style="font-family:Arial,sans-serif;max-width:800px;margin:auto;padding:20px;">
           <h2 style="color:#2d7a2d;">🛒 Ugentlige tilbud på dine produkter</h2>
-          <table width="100%" cellspacing="0" style="border-collapse:collapse;">
-            <tr style="background:#f0f0f0;">
-              <th style="padding:8px;text-align:left;">Butik</th>
-              <th style="padding:8px;text-align:left;">Produkt</th>
-              <th style="padding:8px;text-align:left;">Kontekst</th>
-              <th style="padding:8px;text-align:left;">Link</th>
+          <p style="color:#555;">Her er denne uges tilbud fra REMA 1000, MENY og 365discount:</p>
+          <table width="100%" cellspacing="0" style="border-collapse:collapse;margin-top:16px;">
+            <tr style="background:#f5f5f5;">
+              <th style="padding:10px;text-align:left;">Butik</th>
+              <th style="padding:10px;text-align:left;">Produkt</th>
+              <th style="padding:10px;text-align:left;">Tilbudsnavn</th>
+              <th style="padding:10px;text-align:left;">Pris</th>
+              <th style="padding:10px;text-align:left;">Info</th>
+              <th style="padding:10px;text-align:left;">Link</th>
             </tr>
             {rows}
           </table>
-          <p style="color:#888;font-size:0.85em;margin-top:24px;">
-            Tjekket automatisk hver søndag ✓
+          <p style="color:#aaa;font-size:0.8em;margin-top:24px;">
+            Automatisk tjekket via eTilbudsavis.dk · Kører hver søndag ✓
           </p>
         </body></html>
         """
     else:
-        body = """
-        <html><body style="font-family:Arial,sans-serif;">
+        ingen_rows = "".join(f"<li>{p['navn']}</li>" for p in PRODUCTS)
+        body = f"""
+        <html><body style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px;">
           <h2>🛒 Ingen tilbud denne uge</h2>
-          <p>Ingen af dine produkter var på tilbud i REMA 1000, MENY eller 365discount denne uge.</p>
-          <p style="color:#888;font-size:0.85em;">Tjekket automatisk hver søndag ✓</p>
+          <p>Ingen af følgende produkter var på tilbud i REMA 1000, MENY eller 365discount:</p>
+          <ul>{ingen_rows}</ul>
+          <p>Tjek selv på <a href="https://etilbudsavis.dk">etilbudsavis.dk</a> for at være sikker.</p>
+          <p style="color:#aaa;font-size:0.8em;">Automatisk tjekket · Kører hver søndag ✓</p>
         </body></html>
         """
 
@@ -176,12 +168,21 @@ def send_email(tilbud: list[dict]) -> None:
         server.login(EMAIL_SENDER, EMAIL_PASSWORD)
         server.sendmail(EMAIL_SENDER, EMAIL_RECEIVER, msg.as_string())
 
-    print(f"Mail sendt: {subject}")
+    print(f"✓ Mail sendt: {subject}")
 
 
 # ─── Kør ─────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    print("Tjekker tilbud...")
-    alle_tilbud = check_rema() + check_meny() + check_365()
-    print(f"Fandt {len(alle_tilbud)} tilbud.")
+    print("Tjekker tilbud på eTilbudsavis.dk...")
+    alle_tilbud = []
+
+    for produkt in PRODUCTS:
+        print(f"  Søger efter: {produkt['navn']}...")
+        resultater = søg_etilbudsavis(produkt["søgeord"])
+        fundne = filtrer_tilbud(resultater, produkt["navn"])
+        if fundne:
+            print(f"    → Fandt {len(fundne)} tilbud!")
+        alle_tilbud.extend(fundne)
+
+    print(f"\nTotal: {len(alle_tilbud)} tilbud fundet.")
     send_email(alle_tilbud)
