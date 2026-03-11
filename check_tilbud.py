@@ -125,29 +125,42 @@ def søg_tilbudsugen_365(søgeord: str, produkt_navn: str) -> list[dict]:
         kort = soup.find_all("a", href=re.compile(r"/single/\d+"))
 
         antal = 0
+        set_fundne_hrefs = set()
         for k in kort:
-            tekst = k.get_text(" ", strip=True).lower()
+            href = k.get("href", "")
+
+            # Undgå dubletter – hvert produkt har to <a>-tags (billede + "Se produkt")
+            if href in set_fundne_hrefs:
+                continue
+            # Spring links uden <img> over (dvs. "Se produkt"-links)
+            if not k.find("img"):
+                continue
+
+            # Produktnavn, logo og pris ligger UDENFOR <a> – brug forælderen
+            forælder       = k.parent
+            forælder_tekst = forælder.get_text(" ", strip=True).lower()
+            forælder_html  = str(forælder).lower()
 
             # Tjek at det er 365discount
-            logo = k.find("img")
-            logo_src = (logo.get("src", "") + logo.get("alt", "")).lower() if logo else ""
-            if "365" not in logo_src and "coop365" not in logo_src and "coop 365" not in tekst:
+            if "coop365" not in forælder_html and "365discount" not in forælder_html:
                 continue
 
-            # Tjek at søgeordet findes i kortets tekst
-            if not all(ord.lower() in tekst for ord in søgeord.split()):
+            # Tjek at alle søgeord findes i forælderens tekst
+            if not all(w.lower() in forælder_tekst for w in søgeord.split()):
                 continue
 
-            # Udtræk produktnavn (første linje af tekst, før datoer og pris)
-            linjer = [l.strip() for l in k.get_text("\n", strip=True).split("\n") if l.strip()]
+            set_fundne_hrefs.add(href)
+
+            # Udtræk produktnavn – første meningsfulde linje i forælderens tekst
+            linjer = [l.strip() for l in forælder.get_text("\n", strip=True).split("\n") if l.strip()]
             tilbudsnavn = linjer[0] if linjer else produkt_navn
 
-            # Find pris – leder efter mønster som "14,-" eller "29,95,-"
-            pris_match = re.search(r"(\d+(?:,\d+)?),?-", tekst)
+            # Find pris – mønster som "14,-" eller "29,95,-"
+            pris_match = re.search(r"(\d+(?:,\d+)?),?-", forælder_tekst)
             pris = pris_match.group(0).rstrip("-").rstrip(",") + " kr." if pris_match else "Se avis"
 
             # Find datoer – mønster "05.03 - 11.03"
-            dato_match = re.search(r"(\d{2}\.\d{2})\s*-\s*(\d{2}\.\d{2})", k.get_text())
+            dato_match = re.search(r"(\d{2}\.\d{2})\s*-\s*(\d{2}\.\d{2})", forælder.get_text())
             datoer = dato_match.group(0) if dato_match else ""
 
             fundne.append({
@@ -156,7 +169,7 @@ def søg_tilbudsugen_365(søgeord: str, produkt_navn: str) -> list[dict]:
                 "tilbudsnavn": tilbudsnavn,
                 "pris":        pris,
                 "beskrivelse": datoer,
-                "url":         "https://www.tilbudsugen.dk" + k.get("href", ""),
+                "url":         "https://www.tilbudsugen.dk" + href,
             })
             antal += 1
 
