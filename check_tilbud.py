@@ -1,18 +1,19 @@
 """
 Dansk supermarked tilbuds-checker
-Bruger eTilbudsavis.dk som datakilde (Next.js __NEXT_DATA__).
+Bruger eTilbudsavis.dk som datakilde.
 Kører hver søndag via GitHub Actions og sender en mail
 hvis dine ønskede produkter er på tilbud.
 """
 
 import smtplib
 import os
+import re
 import json
+from html import unescape
 from datetime import datetime, timezone
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import requests
-from bs4 import BeautifulSoup
 
 # ─── Produkter vi leder efter ────────────────────────────────────────────────
 PRODUCTS = [
@@ -41,41 +42,45 @@ HEADERS = {
 }
 
 
-# ─── Udtræk data fra Next.js __NEXT_DATA__ ───────────────────────────────────
-def udtræk_next_data(html: str) -> dict:
-    """Find og parse <script id="__NEXT_DATA__"> blokken."""
-    soup = BeautifulSoup(html, "html.parser")
-    tag = soup.find("script", {"id": "__NEXT_DATA__"})
-    if not tag:
-        print("  __NEXT_DATA__ ikke fundet – prøver alternativ metode")
-        return {}
+# ─── Udtræk JSON fra HTML-siden ───────────────────────────────────────────────
+def udtræk_json(html: str) -> list[dict]:
+    """
+    Siden indeholder JSON som HTML-encoded tekst, fx:
+    {&quot;data&quot;:[{&quot;publicId&quot;: ...}]}
+    Vi HTML-dekoder først, og finder derefter {"data":[...]}
+    """
+    # HTML-dekod hele siden så &quot; → " osv.
+    decoded = unescape(html)
+
+    # Find startposition af JSON-blokken
+    start = decoded.find('{"data":[{"publicId"')
+    if start == -1:
+        # Prøv bredere søgning
+        start = decoded.find('{"data":[{')
+    if start == -1:
+        print("  JSON-blok ikke fundet i siden")
+        return []
+
+    # Tæl krøllede parenteser for at finde korrekt slutning
+    depth = 0
+    end = start
+    for i, ch in enumerate(decoded[start:], start):
+        if ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0:
+                end = i + 1
+                break
+
+    raw = decoded[start:end]
     try:
-        return json.loads(tag.string)
-    except Exception as e:
-        print(f"  JSON-fejl i __NEXT_DATA__: {e}")
-        return {}
-
-
-def find_tilbud_i_data(data: dict, dybde: int = 0) -> list:
-    """Rekursivt søg efter lister af tilbuds-objekter i Next.js data-træet."""
-    resultater = []
-    if dybde > 10:
-        return resultater
-
-    if isinstance(data, list):
-        # Tjek om det er en liste af tilbuds-objekter
-        if data and isinstance(data[0], dict) and any(
-            k in data[0] for k in ["validUntil", "price", "dealer", "business"]
-        ):
-            return data
-        for item in data:
-            resultater.extend(find_tilbud_i_data(item, dybde + 1))
-
-    elif isinstance(data, dict):
-        for v in data.values():
-            resultater.extend(find_tilbud_i_data(v, dybde + 1))
-
-    return resultater
+        data = json.loads(raw)
+        return data.get("data", [])
+    except json.JSONDecodeError as e:
+        print(f"  JSON-fejl: {e}")
+        print(f"  Første 300 tegn: {raw[:300]}")
+        return []
 
 
 # ─── Søg på eTilbudsavis ─────────────────────────────────────────────────────
@@ -86,16 +91,8 @@ def søg_etilbudsavis(søgeord: str) -> list[dict]:
         r.raise_for_status()
         print(f"  HTTP {r.status_code} – side er {len(r.text)} tegn lang")
 
-        next_data = udtræk_next_data(r.text)
-        if not next_data:
-            return []
-
-        # Debug: print øverste nøgler
-        props = next_data.get("props", {}).get("pageProps", {})
-        print(f"  pageProps nøgler: {list(props.keys())[:10]}")
-
-        resultater = find_tilbud_i_data(props)
-        print(f"  Fandt {len(resultater)} tilbuds-objekter")
+        resultater = udtræk_json(r.text)
+        print(f"  Fandt {len(resultater)} tilbuds-objekter i JSON")
         return resultater
 
     except Exception as e:
@@ -109,20 +106,15 @@ def filtrer_tilbud(resultater: list[dict], produkt_navn: str) -> list[dict]:
     fundne = []
 
     for item in resultater:
-        # Butiksnavn kan ligge forskellige steder
-        butik = (
-            item.get("business", {}).get("name", "") or
-            item.get("dealer", {}).get("name", "") or
-            item.get("store", {}).get("name", "")
-        )
+        butik = item.get("business", {}).get("name", "")
 
         if not any(b.lower() in butik.lower() for b in BUTIKKER):
             continue
 
         # Tjek om tilbuddet er aktivt
         try:
-            til_str = (item.get("validUntil") or item.get("run_till") or "").replace("+0000", "+00:00")
-            fra_str = (item.get("validFrom") or item.get("run_from") or "").replace("+0000", "+00:00")
+            til_str = (item.get("validUntil") or "").replace("+0000", "+00:00")
+            fra_str = (item.get("validFrom") or "").replace("+0000", "+00:00")
             if til_str and fra_str:
                 til = datetime.fromisoformat(til_str)
                 fra = datetime.fromisoformat(fra_str)
@@ -131,15 +123,15 @@ def filtrer_tilbud(resultater: list[dict], produkt_navn: str) -> list[dict]:
         except Exception:
             pass
 
-        pris = item.get("price") or item.get("pricing", {}).get("price")
-        beskrivelse = item.get("description") or item.get("heading", "")
+        pris = item.get("price")
+        beskrivelse = item.get("description", "")
 
         fundne.append({
             "butik":       butik,
             "produkt":     produkt_navn,
-            "tilbudsnavn": item.get("name") or item.get("heading", produkt_navn),
+            "tilbudsnavn": item.get("name", produkt_navn),
             "pris":        f"{pris} kr." if pris else "Se avis",
-            "beskrivelse": (beskrivelse[:80] + "…") if beskrivelse and len(beskrivelse) > 80 else (beskrivelse or ""),
+            "beskrivelse": (beskrivelse[:80] + "…") if len(beskrivelse) > 80 else beskrivelse,
             "url":         f"https://etilbudsavis.dk/soeg/{requests.utils.quote(produkt_navn)}",
         })
 
