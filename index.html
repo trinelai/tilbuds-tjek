@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🛒 Tilbuds-tjekker</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green:       #1a6b3a;
+      --green-light: #e8f5ee;
+      --green-mid:   #2d9653;
+      --red:         #c0392b;
+      --red-light:   #fdecea;
+      --gray:        #6b7280;
+      --border:      #e2e8f0;
+      --bg:          #f7f9f7;
+      --white:       #ffffff;
+      --text:        #1a2b1e;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--green);
+      padding: 28px 32px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    header h1 {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.8rem;
+      color: white;
+      letter-spacing: -0.5px;
+    }
+    header p {
+      font-size: 0.9rem;
+      color: rgba(255,255,255,0.75);
+      margin-top: 2px;
+    }
+    .header-icon { font-size: 2.2rem; }
+
+    .container { max-width: 680px; margin: 0 auto; padding: 32px 16px 64px; }
+
+    /* Setup card */
+    .setup-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 28px;
+    }
+    .setup-card h2 {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.15rem;
+      color: var(--green);
+      margin-bottom: 6px;
+    }
+    .setup-card p {
+      font-size: 0.85rem;
+      color: var(--gray);
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
+    .token-row {
+      display: flex;
+      gap: 10px;
+    }
+    .token-row input {
+      flex: 1;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .token-row input:focus { border-color: var(--green-mid); }
+    .btn {
+      padding: 10px 20px;
+      border-radius: 10px;
+      border: none;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-green {
+      background: var(--green);
+      color: white;
+    }
+    .btn-green:hover { background: var(--green-mid); }
+    .btn-green:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      padding: 4px 10px;
+      border-radius: 20px;
+      margin-top: 10px;
+    }
+    .badge-ok  { background: var(--green-light); color: var(--green); }
+    .badge-err { background: var(--red-light);   color: var(--red);   }
+    .badge-loading { background: #fef3c7; color: #92400e; }
+
+    /* Product section */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .section-header h2 {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.25rem;
+      color: var(--text);
+    }
+
+    /* Add form */
+    .add-form {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .add-form label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--gray);
+      display: block;
+      margin-bottom: 4px;
+    }
+    .add-form input {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .add-form input:focus { border-color: var(--green-mid); }
+    .add-form .hint {
+      font-size: 0.78rem;
+      color: var(--gray);
+      margin-top: -6px;
+    }
+    .form-row { display: flex; gap: 12px; }
+    .form-row > div { flex: 1; }
+    .add-form .btn-row {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    /* Product list */
+    .product-list { display: flex; flex-direction: column; gap: 10px; }
+
+    .product-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      transition: box-shadow 0.15s;
+      animation: fadeIn 0.25s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .product-card:hover { box-shadow: 0 2px 12px rgba(26,107,58,0.1); }
+
+    .product-icon {
+      width: 42px; height: 42px;
+      background: var(--green-light);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem;
+      flex-shrink: 0;
+    }
+    .product-info { flex: 1; min-width: 0; }
+    .product-name {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .product-query {
+      font-size: 0.78rem;
+      color: var(--gray);
+      margin-top: 2px;
+    }
+    .delete-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #cbd5e1;
+      font-size: 1.1rem;
+      padding: 6px;
+      border-radius: 8px;
+      transition: all 0.15s;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .delete-btn:hover { background: var(--red-light); color: var(--red); }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--gray);
+      background: white;
+      border: 2px dashed var(--border);
+      border-radius: 16px;
+    }
+    .empty-state .icon { font-size: 2.5rem; margin-bottom: 12px; }
+    .empty-state p { font-size: 0.9rem; }
+
+    /* Save bar */
+    .save-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: white;
+      border-top: 1px solid var(--border);
+      padding: 14px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      transform: translateY(100%);
+      transition: transform 0.25s ease;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.06);
+    }
+    .save-bar.visible { transform: translateY(0); }
+    .save-bar p { font-size: 0.88rem; color: var(--gray); }
+    .save-bar strong { color: var(--text); }
+
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .toast {
+      position: fixed;
+      top: 20px; right: 20px;
+      background: var(--green);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 12px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      box-shadow: 0 4px 20px rgba(26,107,58,0.3);
+      opacity: 0;
+      transform: translateY(-10px);
+      transition: all 0.3s ease;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: none; }
+    .toast.error { background: var(--red); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-icon">🛒</div>
+  <div>
+    <h1>Tilbuds-tjekker</h1>
+    <p>Administrér dine produkter – tjekkes automatisk hver søndag</p>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- GitHub Setup -->
+  <div class="setup-card">
+    <h2>🔑 GitHub forbindelse</h2>
+    <p>Indtast dit GitHub brugernavn og en Personal Access Token for at gemme ændringer direkte i dit repository. Token skal have <strong>repo</strong>-rettighed.</p>
+    <div class="token-row">
+      <input type="text" id="gh-user" placeholder="GitHub brugernavn (fx trinelai)" autocomplete="off">
+      <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off">
+      <button class="btn btn-green" onclick="testToken()">Forbind</button>
+    </div>
+    <div id="token-status"></div>
+  </div>
+
+  <!-- Produkter -->
+  <div class="section-header">
+    <h2>Dine produkter</h2>
+  </div>
+
+  <!-- Tilføj form -->
+  <div class="add-form">
+    <div class="form-row">
+      <div>
+        <label>Produktnavn (til mailen)</label>
+        <input type="text" id="new-navn" placeholder="fx Lurpak smør 200g">
+      </div>
+      <div>
+        <label>Søgeord (til søgning)</label>
+        <input type="text" id="new-søgeord" placeholder="fx lurpak smør">
+        <p class="hint">Skriv de vigtigste ord. Kortere = bredere søgning.</p>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-green" onclick="tilføjProdukt()">+ Tilføj produkt</button>
+    </div>
+  </div>
+
+  <div class="product-list" id="product-list"></div>
+
+</div>
+
+<!-- Save bar -->
+<div class="save-bar" id="save-bar">
+  <p>Du har <strong id="ændringer-antal">0</strong> ugemte ændringer</p>
+  <button class="btn btn-green" id="save-btn" onclick="gem()">Gem til GitHub</button>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+  const REPO = "tilbuds-tjek";
+  const FILE = "produkter.json";
+
+  let produkter = [];
+  let harÆndringer = false;
+
+  // ── Hjælpefunktioner ───────────────────────────────────────────────────────
+
+  function getUser()  { return document.getElementById("gh-user").value.trim(); }
+  function getToken() { return document.getElementById("gh-token").value.trim(); }
+
+  function visToast(besked, fejl = false) {
+    const t = document.getElementById("toast");
+    t.textContent = besked;
+    t.className = "toast show" + (fejl ? " error" : "");
+    setTimeout(() => t.className = "toast", 3000);
+  }
+
+  function setSaveBar(vis) {
+    const bar = document.getElementById("save-bar");
+    if (vis) bar.classList.add("visible");
+    else bar.classList.remove("visible");
+  }
+
+  function opdaterSaveBar() {
+    document.getElementById("ændringer-antal").textContent = produkter.length;
+    setSaveBar(harÆndringer);
+  }
+
+  // ── Tegn produktliste ──────────────────────────────────────────────────────
+
+  const IKONER = ["🥬","🧈","🥖","🥩","🧀","🥕","🍎","🥚","🫙","🥫","🍫","🌿","🛒"];
+
+  function renderListe() {
+    const el = document.getElementById("product-list");
+    if (produkter.length === 0) {
+      el.innerHTML = `
+        <div class="empty-state">
+          <div class="icon">🛒</div>
+          <p>Ingen produkter endnu.<br>Tilføj dit første produkt ovenfor.</p>
+        </div>`;
+      return;
+    }
+    el.innerHTML = produkter.map((p, i) => `
+      <div class="product-card" id="card-${i}">
+        <div class="product-icon">${IKONER[i % IKONER.length]}</div>
+        <div class="product-info">
+          <div class="product-name">${escHtml(p.navn)}</div>
+          <div class="product-query">Søgeord: ${escHtml(p.søgeord)}</div>
+        </div>
+        <button class="delete-btn" onclick="sletProdukt(${i})" title="Slet">✕</button>
+      </div>`).join("");
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
+  // ── Tilføj / slet ──────────────────────────────────────────────────────────
+
+  function tilføjProdukt() {
+    const navn    = document.getElementById("new-navn").value.trim();
+    const søgeord = document.getElementById("new-søgeord").value.trim();
+    if (!navn || !søgeord) { visToast("Udfyld både navn og søgeord", true); return; }
+    produkter.push({ søgeord, navn });
+    document.getElementById("new-navn").value = "";
+    document.getElementById("new-søgeord").value = "";
+    harÆndringer = true;
+    renderListe();
+    opdaterSaveBar();
+  }
+
+  function sletProdukt(i) {
+    produkter.splice(i, 1);
+    harÆndringer = true;
+    renderListe();
+    opdaterSaveBar();
+  }
+
+  // ── GitHub API ─────────────────────────────────────────────────────────────
+
+  async function apiHeaders() {
+    return {
+      "Authorization": `token ${getToken()}`,
+      "Accept": "application/vnd.github.v3+json",
+      "Content-Type": "application/json"
+    };
+  }
+
+  async function testToken() {
+    const statusEl = document.getElementById("token-status");
+    if (!getUser() || !getToken()) {
+      statusEl.innerHTML = `<span class="status-badge badge-err">⚠ Udfyld begge felter</span>`;
+      return;
+    }
+    statusEl.innerHTML = `<span class="status-badge badge-loading">⏳ Tester forbindelse...</span>`;
+    try {
+      const url = `https://api.github.com/repos/${getUser()}/${REPO}/contents/${FILE}`;
+      const headers = await apiHeaders();
+      console.log("Kalder:", url);
+      const r = await fetch(url, { headers });
+      const data = await r.json();
+      console.log("GitHub svar:", r.status, JSON.stringify(data).substring(0, 300));
+
+      if (r.status === 401) {
+        statusEl.innerHTML = `<span class="status-badge badge-err">✗ Token afvist – er token'en kopieret korrekt og har den 'repo'-rettighed?</span>`;
+        return;
+      }
+      if (r.status === 404) {
+        statusEl.innerHTML = `<span class="status-badge badge-err">✗ Ikke fundet – tjek at brugernavn er <b>${getUser()}</b> og at produkter.json er uploadet til repository '${REPO}'</span>`;
+        return;
+      }
+      if (!r.ok) {
+        statusEl.innerHTML = `<span class="status-badge badge-err">✗ GitHub fejl ${r.status}: ${data.message || "ukendt fejl"}</span>`;
+        return;
+      }
+
+      let indhold;
+      if (data.content) {
+        indhold = JSON.parse(atob(data.content.replace(/\n/g,"")));
+      } else if (data.download_url) {
+        const r2 = await fetch(data.download_url);
+        indhold = await r2.json();
+      } else {
+        throw new Error("Filindhold mangler – prøv at slette og genupload produkter.json");
+      }
+      produkter = indhold;
+      harÆndringer = false;
+      renderListe();
+      setSaveBar(false);
+      statusEl.innerHTML = `<span class="status-badge badge-ok">✓ Forbundet – ${produkter.length} produkter indlæst</span>`;
+    } catch(e) {
+      statusEl.innerHTML = `<span class="status-badge badge-err">✗ Fejl: ${e.message}</span>`;
+    }
+  }
+
+  async function gem() {
+    if (!getUser() || !getToken()) { visToast("Forbind til GitHub først", true); return; }
+    const btn = document.getElementById("save-btn");
+    btn.innerHTML = '<span class="spinner"></span>Gemmer...';
+    btn.disabled = true;
+    try {
+      // Hent nuværende SHA (kræves for at opdatere filen)
+      const r1 = await fetch(`https://api.github.com/repos/${getUser()}/${REPO}/contents/${FILE}`,
+        { headers: await apiHeaders() });
+      if (!r1.ok) throw new Error("Kunne ikke hente fil-SHA");
+      const { sha } = await r1.json();
+
+      const indhold = JSON.stringify(produkter, null, 2);
+      const encoded = btoa(unescape(encodeURIComponent(indhold)));
+
+      const r2 = await fetch(`https://api.github.com/repos/${getUser()}/${REPO}/contents/${FILE}`, {
+        method: "PUT",
+        headers: await apiHeaders(),
+        body: JSON.stringify({
+          message: "Opdaterer produkter.json via tilbuds-tjekker",
+          content: encoded,
+          sha: sha
+        })
+      });
+      if (!r2.ok) throw new Error(`HTTP ${r2.status}`);
+
+      harÆndringer = false;
+      setSaveBar(false);
+      btn.innerHTML = "Gem til GitHub";
+      btn.disabled = false;
+      visToast("✓ Gemt! Ændringerne er aktive næste søndag.");
+    } catch(e) {
+      btn.innerHTML = "Gem til GitHub";
+      btn.disabled = false;
+      visToast("Fejl: " + e.message, true);
+    }
+  }
+
+  // ── Enter i input felter ───────────────────────────────────────────────────
+  document.getElementById("new-søgeord").addEventListener("keydown", e => {
+    if (e.key === "Enter") tilføjProdukt();
+  });
+
+  // Init
+  renderListe();
+</script>
+</body>
+</html>
