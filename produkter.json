@@ -20,10 +20,6 @@
     "navn": "Den Grønne Slagter rullepølse"
   },
   {
-    "søgeord": "Zanetti Parmigiano",
-    "navn": "Zanetti Parmigiano Reggiano 200g"
-  },
-  {
     "søgeord": "æg",
     "navn": "Æg"
   },
@@ -42,5 +38,9 @@
   {
     "søgeord": "mælk Thiese",
     "navn": "Skummetmælk Thiese"
+  },
+  {
+    "søgeord": "Zanetti Parmigiano 200g",
+    "navn": "Zanetti Parmigiano Reggiano 200g ost"
   }
 ]
