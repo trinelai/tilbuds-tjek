@@ -465,6 +465,21 @@
     return "🛒"; // fallback
   }
 
+  // ── Lokalt lager (localStorage) ───────────────────────────────────────────
+
+  const LS_KEY = "tilbuds-tjekker-produkter";
+
+  function gemLokalt() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(produkter)); } catch(e) {}
+  }
+
+  function indlæsLokalt() {
+    try {
+      const gemt = localStorage.getItem(LS_KEY);
+      if (gemt) produkter = JSON.parse(gemt);
+    } catch(e) {}
+  }
+
   // ── Hjælpefunktioner ───────────────────────────────────────────────────────
 
   function getUser()  { return document.getElementById("gh-user").value.trim(); }
@@ -525,6 +540,7 @@
     document.getElementById("new-navn").value = "";
     document.getElementById("new-søgeord").value = "";
     harÆndringer = true;
+    gemLokalt();
     renderListe();
     opdaterSaveBar();
   }
@@ -532,6 +548,7 @@
   function sletProdukt(i) {
     produkter.splice(i, 1);
     harÆndringer = true;
+    gemLokalt();
     renderListe();
     opdaterSaveBar();
   }
@@ -581,6 +598,7 @@
       const indhold = await r2.json();
       produkter = indhold;
       harÆndringer = false;
+      gemLokalt();
       renderListe();
       setSaveBar(false);
       statusEl.innerHTML = `<span class="status-badge badge-ok">✓ Forbundet – ${produkter.length} produkter indlæst</span>`;
@@ -632,8 +650,11 @@
     if (e.key === "Enter") tilføjProdukt();
   });
 
-  // Init
+  // Init – indlæs gemte produkter fra browseren
+  indlæsLokalt();
+  if (produkter.length > 0) harÆndringer = true; // marker at GitHub måske ikke er synkroniseret
   renderListe();
+  opdaterSaveBar();
 </script>
 </body>
 </html>
