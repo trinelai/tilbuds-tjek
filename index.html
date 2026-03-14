@@ -353,6 +353,118 @@
   let produkter = [];
   let harÆndringer = false;
 
+  // ── Ikonmatchning baseret på nøgleord ──────────────────────────────────────
+  // Hvert entry er [ikon, [nøgleord der matcher (lowercase)]].
+  // Gennemsøges i rækkefølge – første match vinder.
+  const IKON_REGLER = [
+    // Mejeriprodukter
+    ["🧈", ["smør", "butter", "lurpak", "arla smør", "margarine", "bregott"]],
+    ["🥛", ["mælk", "milk", "letmælk", "sødmælk", "skummetmælk", "minimælk", "havremælk", "mandelmælk", "sojamælk"]],
+    ["🧀", ["ost", "cheese", "cheddar", "gouda", "brie", "feta", "mozzarella", "havarti", "danbo", "emmentaler", "gruyère"]],
+    ["🍦", ["fløde", "piskefløde", "cremefraiche", "creme fraiche", "fraiche", "kvark", "skyr", "yoghurt", "ymer"]],
+    ["🥚", ["æg", "eggs", "egg", "æggepakke"]],
+
+    // Brød & bagværk
+    ["🍞", ["rugbrød", "rye bread", "rugmel", "rug"]],
+    ["🥐", ["croissant", "wienerbrød", "kanelsnegl", "snegl", "bolle", "rundstykke", "bagel", "bagværk"]],
+    ["🍞", ["brød", "bread", "toast", "toastbrød", "franskbrød", "sandwichbrød", "baguette", "ciabatta", "focaccia"]],
+
+    // Kød & fisk
+    ["🥩", ["oksekød", "hakket oksekød", "bøf", "steak", "beef", "entrecôte", "roastbeef", "oksesteg", "okse"]],
+    ["🍗", ["kylling", "chicken", "kyllingefilet", "kyllingebryst", "kyllingelår", "kyllingevinge", "kalkun", "turkey"]],
+    ["🥓", ["bacon", "pancetta", "flæsk", "flæskesteg", "ribbensteg", "nakkefilet", "svinekød", "svin", "svinefilet", "koteletter"]],
+    ["🌭", ["pølse", "sausage", "medister", "wienerpølse", "hotdog", "cocktailpølse", "leverpostej"]],
+    ["🐟", ["fisk", "fish", "laks", "salmon", "torsk", "cod", "tun", "tuna", "makrel", "sild", "reje", "rejer", "shrimp", "tilapia", "ørred"]],
+
+    // Frugt
+    ["🍎", ["æble", "apple", "æbler", "granny smith", "cox", "gala"]],
+    ["🍌", ["banan", "banana", "bananer"]],
+    ["🍊", ["appelsin", "orange", "mandarin", "klementin", "citrus"]],
+    ["🍋", ["citron", "lemon", "lime"]],
+    ["🍇", ["drue", "druer", "grape", "grapes", "vindrue"]],
+    ["🍓", ["jordbær", "strawberry", "hindbær", "raspberry", "blåbær", "blueberry", "bær"]],
+    ["🍑", ["fersken", "peach", "nektarin", "abrikos", "plomme", "blomme"]],
+    ["🍍", ["ananas", "pineapple", "mango", "papaya", "passionsfrugt"]],
+    ["🍉", ["vandmelon", "melon", "watermelon", "cantaloupe"]],
+    ["🍒", ["kirsebær", "cherry", "cherries"]],
+
+    // Grøntsager
+    ["🥕", ["gulerod", "gulerødder", "carrot"]],
+    ["🥦", ["broccoli", "blomkål", "romanesco"]],
+    ["🥬", ["salat", "rucola", "spinat", "spidskål", "iceberg", "lettuce", "grønkål", "kål", "bok choy"]],
+    ["🍅", ["tomat", "tomater", "tomato", "cherrytomater", "cocktailtomater"]],
+    ["🧅", ["løg", "onion", "rødløg", "forårsløg", "purløg", "hvidløg", "skalotteløg"]],
+    ["🥔", ["kartofler", "kartoffel", "potato", "potatoes", "sweet potato", "søde kartofler", "bagte kartofler"]],
+    ["🌽", ["majs", "corn", "maize"]],
+    ["🫑", ["peber", "peberfrugt", "paprika", "chili", "jalapeño", "capsicum"]],
+    ["🥒", ["agurk", "cucumber", "courgette", "zucchini"]],
+    ["🧄", ["hvidløg", "garlic"]],
+    ["🍄", ["svampe", "svamp", "champignon", "mushroom", "portobello", "shiitake"]],
+    ["🫘", ["bønner", "linser", "kikærter", "ærter", "beans", "lentils", "chickpeas", "edamame"]],
+
+    // Kornprodukter & tørvarer
+    ["🌾", ["mel", "flour", "hvedemel", "rug", "havre", "havregryn", "oatmeal", "spelt", "graham"]],
+    ["🍚", ["ris", "rice", "basmati", "jasminris", "grødris"]],
+    ["🍝", ["pasta", "spaghetti", "penne", "fusilli", "lasagne", "tagliatelle", "macaroni", "nudler", "noodles"]],
+    ["🥣", ["grød", "müsli", "muesli", "granola", "cornflakes", "morgenmad", "havregrød"]],
+
+    // Dåse- & færdigretter
+    ["🥫", ["dåse", "can", "konserves", "tomatpure", "tomatsauce", "hakkede tomater", "kokosmælk", "linsesuppe", "bønnesuppe"]],
+    ["🍲", ["suppe", "soup", "bouillon", "fond", "consommé"]],
+
+    // Snacks & slik
+    ["🍫", ["chokolade", "chocolate", "kakao", "cacao", "nutella", "pålægschokolade"]],
+    ["🍬", ["slik", "candy", "vingummi", "lakrids", "skumfidus", "bolsje"]],
+    ["🍪", ["kiks", "biscuit", "cookies", "cookie", "digestive", "vafler"]],
+    ["🥜", ["nødder", "nuts", "mandler", "almonds", "cashew", "valnød", "jordnødder", "peanuts", "pistacienødder"]],
+    ["🍿", ["popcorn", "chips", "snack", "kræmmerhus"]],
+
+    // Drikkevarer
+    ["☕", ["kaffe", "coffee", "espresso", "cappuccino", "latte", "nescafé", "kaffekapsler"]],
+    ["🍵", ["te", "tea", "grøn te", "sort te", "urtete", "kamillete", "ingefærte"]],
+    ["🧃", ["juice", "saft", "appelsinjuice", "æblejuice", "smoothie", "nektar"]],
+    ["🥤", ["sodavand", "cola", "pepsi", "sprite", "fanta", "energy drink", "redbull", "monster"]],
+    ["💧", ["vand", "water", "mineralvand", "danskvand", "kildevand", "perrier", "evian"]],
+    ["🍺", ["øl", "beer",","lager", "pilsner", "ale", "stout", "carlsberg", "tuborg"]],
+    ["🍷", ["vin", "wine", "rødvin", "hvidvin", "rosévin", "rosé", "prosecco", "champagne", "cava"]],
+
+    // Krydderier & olier
+    ["🫒", ["olivenolie", "olive oil", "olie", "oil", "rapsolie", "kokosolie", "solsikkeolie"]],
+    ["🧂", ["salt", "peber", "krydderier", "spices", "paprikapulver", "gurkemeje", "karry", "curry", "kanel", "oregano", "timian", "basilikum"]],
+    ["🫙", ["eddike", "vinegar", "soja", "soy", "worcestershire", "tabasco", "pesto", "hummus", "dip", "dressing"]],
+    ["🍯", ["honning", "honey", "sirup", "maple syrup", "ahornsirup", "agave"]],
+
+    // Brød & smørepålæg (sødt/salt)
+    ["🥜", ["peanutbutter", "jordnøddesmør", "mandelsmør", "nutella"]],
+    ["🍓", ["syltetøj", "jam", "marmelade", "konfiture", "æblemos"]],
+
+    // Rengøring & husholdning
+    ["🧼", ["sæbe", "soap", "håndvask", "opvask", "opvaskemiddel", "fairy", "ajax"]],
+    ["🧻", ["toiletpapir", "køkkenrulle", "papirhåndklæder", "tissue", "servietter"]],
+    ["🫧", ["rengøringsmiddel", "all-purpose", "universalrens", "wc-ren", "bathroom cleaner"]],
+    ["🧴", ["shampoo", "conditioner", "shower gel", "brusegel", "bodywash", "hårbalsam"]],
+
+    // Frost
+    ["🧊", ["frossen", "frost", "frozen", "frosne", "frossent", "is", "ispinde", "flødeis"]],
+
+    // Fallback
+    ["🛒", []],
+  ];
+
+  /**
+   * Returnerer det bedst matchende ikon for et produktnavn + søgeord.
+   * Søger case-insensitivt i den kombinerede tekst.
+   */
+  function vælgIkon(navn, søgeord) {
+    const tekst = (navn + " " + søgeord).toLowerCase();
+    for (const [ikon, nøgleord] of IKON_REGLER) {
+      for (const k of nøgleord) {
+        if (tekst.includes(k)) return ikon;
+      }
+    }
+    return "🛒"; // fallback
+  }
+
   // ── Hjælpefunktioner ───────────────────────────────────────────────────────
 
   function getUser()  { return document.getElementById("gh-user").value.trim(); }
@@ -378,8 +490,6 @@
 
   // ── Tegn produktliste ──────────────────────────────────────────────────────
 
-  const IKONER = ["🥬","🧈","🥖","🥩","🧀","🥕","🍎","🥚","🫙","🥫","🍫","🌿","🛒"];
-
   function renderListe() {
     const el = document.getElementById("product-list");
     if (produkter.length === 0) {
@@ -392,7 +502,7 @@
     }
     el.innerHTML = produkter.map((p, i) => `
       <div class="product-card" id="card-${i}">
-        <div class="product-icon">${IKONER[i % IKONER.length]}</div>
+        <div class="product-icon">${vælgIkon(p.navn, p.søgeord)}</div>
         <div class="product-info">
           <div class="product-name">${escHtml(p.navn)}</div>
           <div class="product-query">Søgeord: ${escHtml(p.søgeord)}</div>
