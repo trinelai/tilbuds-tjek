@@ -39,7 +39,7 @@ HEADERS = {
 # KILDE 1: eTilbudsavis.dk  →  REMA 1000, MENY, SuperBrugsen
 # ══════════════════════════════════════════════════════════════════════════════
 
-ETILBUD_BUTIKKER = ["REMA 1000", "MENY", "SuperBrugsen"]
+ETILBUD_BUTIKKER = ["REMA 1000", "MENY", "Netto", "SuperBrugsen"]
 
 def udtræk_json_etilbud(html: str) -> list:
     decoded = unescape(html)
