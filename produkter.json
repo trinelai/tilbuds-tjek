@@ -50,5 +50,9 @@
   {
     "søgeord": "blomkål",
     "navn": "Blomkål"
+  },
+  {
+    "søgeord": "broccoli",
+    "navn": "Broccoli"
   }
 ]
