@@ -12,10 +12,6 @@
     "navn": "Kims saltede peanuts 1 kg"
   },
   {
-    "søgeord": "den grønne slagter rullepølse",
-    "navn": "Den Grønne Slagter rullepølse"
-  },
-  {
     "søgeord": "æg",
     "navn": "Æg"
   },
@@ -62,5 +58,9 @@
   {
     "søgeord": "zanetti parmigiano",
     "navn": "Zanetti Parmigiano ost"
+  },
+  {
+    "søgeord": "gin",
+    "navn": "Gin"
   }
 ]
