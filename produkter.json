@@ -8,10 +8,6 @@
     "navn": "Spidskål"
   },
   {
-    "søgeord": "smør",
-    "navn": "Smør"
-  },
-  {
     "søgeord": "kims peanuts",
     "navn": "Kims saltede peanuts 1 kg"
   },
@@ -24,20 +20,12 @@
     "navn": "Æg"
   },
   {
-    "søgeord": "Naturli havredrik",
-    "navn": "Naturli' havredrik"
-  },
-  {
     "søgeord": "Creme fraise 18%",
     "navn": "Creme fraise 18%"
   },
   {
     "søgeord": "Lotus Premium",
     "navn": "Lotus Premium wc-papir"
-  },
-  {
-    "søgeord": "Zanetti Parmigiano 200g",
-    "navn": "Zanetti Parmigiano Reggiano 200g ost"
   },
   {
     "søgeord": "Livol Multivitamin",
@@ -62,5 +50,17 @@
   {
     "søgeord": "Squash fersken",
     "navn": "Squash fersken"
+  },
+  {
+    "søgeord": "lurpak",
+    "navn": "Lurpak smør"
+  },
+  {
+    "søgeord": "den grønne slagter",
+    "navn": "Den grønne slagter hamburgerryg"
+  },
+  {
+    "søgeord": "zanetti parmigiano",
+    "navn": "Zanetti Parmigiano ost"
   }
 ]
