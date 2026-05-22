@@ -2,10 +2,8 @@ name: Ugentlig tilbuds-tjek
 
 on:
   schedule:
-    # Kører hver søndag og torsdag kl. 01:00 dansk tid (= 02:00 UTC om sommeren)
-    - cron: "0 0 * * 0"
-    - cron: "0 4 * * 0"
-    - cron: "0 5 * * 0"
+    # Kører hver søndag, torsdag, fredag, lørdag kl. 00:00 UTC (01:00 CET vintertid/02:00 CET sommertid)
+    - cron: "0 0 * * 0,4,5,6"
   workflow_dispatch:   # Giver dig mulighed for at køre det manuelt med et klik
 
 jobs:
