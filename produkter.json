@@ -16,14 +16,6 @@
     "navn": "Æg"
   },
   {
-    "søgeord": "Creme fraise 18%",
-    "navn": "Creme fraise 18%"
-  },
-  {
-    "søgeord": "Lotus Premium",
-    "navn": "Lotus Premium wc-papir"
-  },
-  {
     "søgeord": "Livol Multivitamin",
     "navn": "Livol Multivitamin"
   },
@@ -66,5 +58,13 @@
   {
     "søgeord": "them fætter kras",
     "navn": "Them Fætter Kras"
+  },
+  {
+    "søgeord": "Tanqueray Gin",
+    "navn": "Tanqueray Gin"
+  },
+  {
+    "søgeord": "padano",
+    "navn": "Grana Padano ost"
   }
 ]
