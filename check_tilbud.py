@@ -1,7 +1,7 @@
 """
 Dansk supermarked tilbuds-checker
 - eTilbudsavis.dk  → REMA 1000, MENY og SuperBrugsen
-- tilbudsugen.dk   → 365discount og SuperBrugsen
+- tilbudsugen.dk   → 365discount, SuperBrugsen og Dagli'Brugsen
 Læser produktliste fra produkter.json i samme mappe.
 Kører hver søndag via GitHub Actions.
 """
@@ -102,13 +102,14 @@ def filtrer_etilbud(resultater: list, produkt_navn: str) -> list:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# KILDE 2: tilbudsugen.dk  →  365discount og SuperBrugsen
+# KILDE 2: tilbudsugen.dk  →  365discount, SuperBrugsen og Dagli'Brugsen
 # ══════════════════════════════════════════════════════════════════════════════
 
 TILBUDSUGEN_BUTIKKER = {
     "coop365":      "365discount",
     "365discount":  "365discount",
     "superbrugsen": "SuperBrugsen",
+    "daglibrugsen": "Dagli'Brugsen",
 }
 
 def søg_tilbudsugen(søgeord: str, produkt_navn: str) -> list:
@@ -169,7 +170,7 @@ def søg_tilbudsugen(søgeord: str, produkt_navn: str) -> list:
             })
             antal += 1
 
-        print(f"  [tilbudsugen]  Fandt {antal} tilbud (365discount + SuperBrugsen)")
+        print(f"  [tilbudsugen]  Fandt {antal} tilbud (365discount + SuperBrugsen + Dagli'Brugsen)")
     except Exception as e:
         print(f"  [tilbudsugen]  Fejl: {e}")
     return fundne
@@ -204,7 +205,7 @@ def send_email(tilbud: list) -> None:
         body = f"""
         <html><body style="font-family:Arial,sans-serif;max-width:800px;margin:auto;padding:20px;">
           <h2 style="color:#2d7a2d;">🛒 Ugentlige tilbud på dine produkter</h2>
-          <p style="color:#555;">Tjekket hos REMA 1000, MENY, 365discount og SuperBrugsen:</p>
+          <p style="color:#555;">Tjekket hos REMA 1000, MENY, 365discount, SuperBrugsen og Dagli'Brugsen:</p>
           <table width="100%" cellspacing="0" style="border-collapse:collapse;margin-top:16px;">
             <tr style="background:#f5f5f5;">
               <th style="padding:10px;text-align:left;">Butik</th>
@@ -258,7 +259,7 @@ if __name__ == "__main__":
         alle_tilbud.extend(fundne)
 
         fundne2 = søg_tilbudsugen(produkt["søgeord"], produkt["navn"])
-        print(f"  → {len(fundne2)} tilbud fra 365discount/SuperBrugsen")
+        print(f"  → {len(fundne2)} tilbud fra 365discount/SuperBrugsen/Dagli'Brugsen")
         alle_tilbud.extend(fundne2)
         print()
 
