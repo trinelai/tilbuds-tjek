@@ -16,10 +16,6 @@
     "navn": "Æg"
   },
   {
-    "søgeord": "Livol Multivitamin",
-    "navn": "Livol Multivitamin"
-  },
-  {
     "søgeord": "Lambi Premium",
     "navn": "Lambi Premium wc-papir"
   },
@@ -42,10 +38,6 @@
   {
     "søgeord": "zanetti parmigiano",
     "navn": "Zanetti Parmigiano ost"
-  },
-  {
-    "søgeord": "gin",
-    "navn": "Gin"
   },
   {
     "søgeord": "Glyngøre tun",
@@ -90,5 +82,13 @@
   {
     "søgeord": "mandler",
     "navn": "Mandler"
+  },
+  {
+    "søgeord": "bombay",
+    "navn": "Bombay gin"
+  },
+  {
+    "søgeord": "Livol Multivitamin 50",
+    "navn": "Livol Multivitamin 50"
   }
 ]
