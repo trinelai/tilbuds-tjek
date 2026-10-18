@@ -8,10 +8,6 @@
     "navn": "Spidskål"
   },
   {
-    "søgeord": "kims peanuts",
-    "navn": "Kims saltede peanuts 1 kg"
-  },
-  {
     "søgeord": "æg",
     "navn": "Æg"
   },
@@ -38,10 +34,6 @@
   {
     "søgeord": "Glyngøre tun",
     "navn": "Glyngøre tun"
-  },
-  {
-    "søgeord": "friland bacon",
-    "navn": "Friland bacon"
   },
   {
     "søgeord": "them fætter kras",
@@ -90,5 +82,17 @@
   {
     "søgeord": "lambi toiletpapir",
     "navn": "Lambi Classic"
+  },
+  {
+    "søgeord": "confit de canard",
+    "navn": "Confit de canard"
+  },
+  {
+    "søgeord": "confiteret and",
+    "navn": "Confiteret and"
+  },
+  {
+    "søgeord": "lotus premium toiletpapir",
+    "navn": "Lotus premium toiletpapir"
   }
 ]
