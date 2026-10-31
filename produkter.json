@@ -40,10 +40,6 @@
     "navn": "Them Fætter Kras"
   },
   {
-    "søgeord": "Tanqueray Gin",
-    "navn": "Tanqueray Gin"
-  },
-  {
     "søgeord": "padano",
     "navn": "Grana Padano ost"
   },
@@ -92,15 +88,19 @@
     "navn": "Lotus premium toiletpapir"
   },
   {
-    "søgeord": "tanqueray gin",
-    "navn": "Tanqueray Gin"
-  },
-  {
     "søgeord": "bombay sapphire",
     "navn": "Bombay Sapphire"
   },
   {
     "søgeord": "Thomas Henry",
     "navn": "Thomas Henry tonic"
+  },
+  {
+    "søgeord": "tanqueray",
+    "navn": "Tanqueray gin"
+  },
+  {
+    "søgeord": "konfiteret and",
+    "navn": "konfiteret and"
   }
 ]
