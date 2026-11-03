@@ -24,20 +24,12 @@
     "navn": "Lurpak smør"
   },
   {
-    "søgeord": "den grønne slagter",
-    "navn": "Den grønne slagter hamburgerryg"
-  },
-  {
     "søgeord": "zanetti parmigiano",
     "navn": "Zanetti Parmigiano ost"
   },
   {
     "søgeord": "Glyngøre tun",
     "navn": "Glyngøre tun"
-  },
-  {
-    "søgeord": "them fætter kras",
-    "navn": "Them Fætter Kras"
   },
   {
     "søgeord": "padano",
@@ -106,5 +98,17 @@
   {
     "søgeord": "Confiterede andelår",
     "navn": "Confiterede andelår"
+  },
+  {
+    "søgeord": "Them fætter kræs",
+    "navn": "Them Fætter Kras"
+  },
+  {
+    "søgeord": "Schulstad brød",
+    "navn": "Schulstad brød"
+  },
+  {
+    "søgeord": "grønne slagter hamburgerryg",
+    "navn": "Den grønne slagter hamburgerryg"
   }
 ]
